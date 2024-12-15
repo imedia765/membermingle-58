@@ -1,75 +1,130 @@
-import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
-import { Input } from "@/components/ui/input";
-import { Button } from "@/components/ui/button";
-import { User, Mail, Phone, Lock } from "lucide-react";
+import { useState } from "react";
+import { useQuery } from "@tanstack/react-query";
+import { supabase } from "@/integrations/supabase/client";
+import { AccountSettingsSection } from "@/components/profile/AccountSettingsSection";
+import { DocumentsSection } from "@/components/profile/DocumentsSection";
+import { PaymentHistorySection } from "@/components/profile/PaymentHistorySection";
+import { SupportSection } from "@/components/profile/SupportSection";
+import { Skeleton } from "@/components/ui/skeleton";
+import { useToast } from "@/components/ui/use-toast";
+
+interface Payment {
+  date: string;
+  amount: string;
+  status: string;
+  type: string;
+}
 
 export default function Profile() {
+  const [searchDate, setSearchDate] = useState("");
+  const [searchAmount, setSearchAmount] = useState("");
+  const { toast } = useToast();
+
+  // Fetch member profile data
+  const { data: memberData, isLoading: memberLoading } = useQuery({
+    queryKey: ['member-profile'],
+    queryFn: async () => {
+      const { data, error } = await supabase
+        .from('members')
+        .select('*')
+        .limit(1)
+        .single();
+
+      if (error) {
+        toast({
+          title: "Error fetching profile",
+          description: error.message,
+          variant: "destructive",
+        });
+        throw error;
+      }
+
+      return data;
+    },
+  });
+
+  // Fetch payment history
+  const { data: paymentsData, isLoading: paymentsLoading } = useQuery({
+    queryKey: ['member-payments'],
+    queryFn: async () => {
+      const { data, error } = await supabase
+        .from('payments')
+        .select('*')
+        .order('payment_date', { ascending: false });
+
+      if (error) {
+        toast({
+          title: "Error fetching payments",
+          description: error.message,
+          variant: "destructive",
+        });
+        throw error;
+      }
+
+      // Transform the data to match the Payment interface
+      return (data || []).map(payment => ({
+        date: payment.payment_date,
+        amount: payment.amount.toString(),
+        status: payment.status,
+        type: payment.payment_type
+      }));
+    },
+  });
+
+  // Mock document types (this could be moved to a constants file)
+  const documentTypes = [
+    { type: 'Identification', description: 'Valid ID document (Passport, Driving License)' },
+    { type: 'Address Proof', description: 'Recent utility bill or bank statement' },
+    { type: 'Medical Certificate', description: 'Recent medical certificate if applicable' },
+    { type: 'Marriage Certificate', description: 'Marriage certificate if applicable' },
+  ];
+
+  // Mock documents (you might want to add a documents table to Supabase later)
+  const documents = [
+    { name: 'ID Document.pdf', uploadDate: '2024-03-01', type: 'Identification' },
+    { name: 'Proof of Address.pdf', uploadDate: '2024-02-15', type: 'Address Proof' },
+  ];
+
+  if (memberLoading || paymentsLoading) {
+    return (
+      <div className="space-y-6 max-w-5xl mx-auto p-6">
+        <Skeleton className="h-8 w-64" />
+        <div className="space-y-6">
+          <Skeleton className="h-96" />
+          <Skeleton className="h-64" />
+          <Skeleton className="h-64" />
+          <Skeleton className="h-64" />
+        </div>
+      </div>
+    );
+  }
+
+  const filteredPayments = paymentsData?.filter(payment => {
+    const matchesDate = searchDate ? payment.date.includes(searchDate) : true;
+    const matchesAmount = searchAmount ? payment.amount.includes(searchAmount) : true;
+    return matchesDate && matchesAmount;
+  }) || [];
+
   return (
-    <div className="space-y-6">
+    <div className="space-y-6 max-w-5xl mx-auto">
       <h1 className="text-4xl font-bold bg-gradient-to-r from-primary via-primary/80 to-primary/60 bg-clip-text text-transparent">
-        Admin Profile
+        Member Profile
       </h1>
 
-      <div className="grid gap-6 md:grid-cols-2">
-        <Card>
-          <CardHeader>
-            <CardTitle>Personal Information</CardTitle>
-          </CardHeader>
-          <CardContent className="space-y-4">
-            <div className="space-y-2">
-              <label className="text-sm font-medium flex items-center gap-2">
-                <User className="h-4 w-4" />
-                Full Name
-              </label>
-              <Input defaultValue="Admin User" />
-            </div>
-            <div className="space-y-2">
-              <label className="text-sm font-medium flex items-center gap-2">
-                <Mail className="h-4 w-4" />
-                Email
-              </label>
-              <Input defaultValue="admin@example.com" type="email" />
-            </div>
-            <div className="space-y-2">
-              <label className="text-sm font-medium flex items-center gap-2">
-                <Phone className="h-4 w-4" />
-                Phone
-              </label>
-              <Input defaultValue="+44 123 456 7890" type="tel" />
-            </div>
-            <Button className="w-full">Update Profile</Button>
-          </CardContent>
-        </Card>
-
-        <Card>
-          <CardHeader>
-            <CardTitle>Security Settings</CardTitle>
-          </CardHeader>
-          <CardContent className="space-y-4">
-            <div className="space-y-2">
-              <label className="text-sm font-medium flex items-center gap-2">
-                <Lock className="h-4 w-4" />
-                Current Password
-              </label>
-              <Input type="password" />
-            </div>
-            <div className="space-y-2">
-              <label className="text-sm font-medium flex items-center gap-2">
-                <Lock className="h-4 w-4" />
-                New Password
-              </label>
-              <Input type="password" />
-            </div>
-            <div className="space-y-2">
-              <label className="text-sm font-medium flex items-center gap-2">
-                <Lock className="h-4 w-4" />
-                Confirm New Password
-              </label>
-              <Input type="password" />
-            </div>
-            <Button className="w-full" variant="outline">Change Password</Button>
-          </CardContent>
-        </Card>
+      <div className="space-y-6">
+        <AccountSettingsSection memberData={memberData} />
+        <DocumentsSection 
+          documents={documents}
+          documentTypes={documentTypes}
+        />
+        <PaymentHistorySection 
+          payments={filteredPayments}
+          searchDate={searchDate}
+          searchAmount={searchAmount}
+          onSearchDateChange={setSearchDate}
+          onSearchAmountChange={setSearchAmount}
+        />
+        <SupportSection />
       </div>
     </div>
   );
