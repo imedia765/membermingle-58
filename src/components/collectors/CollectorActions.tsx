@@ -20,7 +20,7 @@ import {
   SelectTrigger,
   SelectValue,
 } from "@/components/ui/select";
-import { Edit2, Trash2, UserCheck, Ban, ChevronDown, UserMinus } from "lucide-react";
+import { Edit2, Trash2, UserCheck, Ban, ChevronDown, UserMinus, Printer } from "lucide-react";
 import { useToast } from "@/components/ui/use-toast";
 import { supabase } from "@/integrations/supabase/client";
 import { useState } from "react";
@@ -30,6 +30,7 @@ interface CollectorActionsProps {
     id: string;
     name: string;
     active?: boolean | null;
+    members?: any[];
   };
   collectors: Array<{ id: string; name: string }>;
   onEdit: (collector: { id: string; name: string }) => void;
@@ -40,6 +41,57 @@ export function CollectorActions({ collector, collectors, onEdit, onUpdate }: Co
   const { toast } = useToast();
   const [showMoveDialog, setShowMoveDialog] = useState(false);
   const [selectedCollectorId, setSelectedCollectorId] = useState<string>("");
+
+  const handlePrintCollector = () => {
+    const printContent = `
+      <html>
+        <head>
+          <title>Collector Details - ${collector.name}</title>
+          <style>
+            body { font-family: Arial, sans-serif; padding: 20px; }
+            h1 { color: #333; }
+            table { width: 100%; border-collapse: collapse; margin-top: 20px; }
+            th, td { border: 1px solid #ddd; padding: 8px; text-align: left; }
+            th { background-color: #f5f5f5; }
+          </style>
+        </head>
+        <body>
+          <h1>Collector: ${collector.name}</h1>
+          <h2>Members List</h2>
+          <table>
+            <thead>
+              <tr>
+                <th>Name</th>
+                <th>Member ID</th>
+                <th>Email</th>
+                <th>Contact</th>
+                <th>Address</th>
+              </tr>
+            </thead>
+            <tbody>
+              ${collector.members?.map(member => `
+                <tr>
+                  <td>${member.full_name}</td>
+                  <td>${member.member_number}</td>
+                  <td>${member.email || '-'}</td>
+                  <td>${member.phone || '-'}</td>
+                  <td>${member.address || '-'}</td>
+                </tr>
+              `).join('') || '<tr><td colspan="5">No members found</td></tr>'}
+            </tbody>
+          </table>
+          <p>Printed on: ${new Date().toLocaleString()}</p>
+        </body>
+      </html>
+    `;
+
+    const printWindow = window.open('', '_blank');
+    if (printWindow) {
+      printWindow.document.write(printContent);
+      printWindow.document.close();
+      printWindow.print();
+    }
+  };
 
   const handleDeleteCollector = async () => {
     const { error } = await supabase
@@ -149,6 +201,9 @@ export function CollectorActions({ collector, collectors, onEdit, onUpdate }: Co
           </DropdownMenuItem>
           <DropdownMenuItem onClick={() => setShowMoveDialog(true)} className="gap-2">
             <UserMinus className="h-4 w-4" /> Move Members
+          </DropdownMenuItem>
+          <DropdownMenuItem onClick={handlePrintCollector} className="gap-2">
+            <Printer className="h-4 w-4" /> Print Details
           </DropdownMenuItem>
           <DropdownMenuSeparator />
           <DropdownMenuItem onClick={handleActivateCollector} className="gap-2">
