@@ -54,22 +54,26 @@ export default function Profile() {
     queryKey: ['member-profile', userEmail],
     enabled: !!userEmail,
     queryFn: async () => {
+      console.log('Fetching profile for email:', userEmail);
+      
       const { data, error } = await supabase
         .from('members')
-        .select('*')
+        .select('*, family_members(*)')
         .eq('email', userEmail)
-        .maybeSingle(); // Using maybeSingle() instead of single()
+        .maybeSingle();
 
       if (error) {
+        console.error('Error fetching profile:', error);
         toast({
           title: "Error fetching profile",
           description: error.message,
           variant: "destructive",
         });
-        throw error;
+        return null;
       }
 
       if (!data) {
+        console.log('No profile found for email:', userEmail);
         toast({
           title: "Profile not found",
           description: "No member profile found for this email address.",
@@ -78,6 +82,7 @@ export default function Profile() {
         return null;
       }
 
+      console.log('Found profile:', data);
       return data;
     },
   });
@@ -87,6 +92,8 @@ export default function Profile() {
     queryKey: ['member-payments', memberData?.id],
     enabled: !!memberData?.id,
     queryFn: async () => {
+      console.log('Fetching payments for member:', memberData?.id);
+      
       const { data, error } = await supabase
         .from('payments')
         .select('*')
@@ -94,14 +101,16 @@ export default function Profile() {
         .order('payment_date', { ascending: false });
 
       if (error) {
+        console.error('Error fetching payments:', error);
         toast({
           title: "Error fetching payments",
           description: error.message,
           variant: "destructive",
         });
-        throw error;
+        return [];
       }
 
+      console.log('Found payments:', data);
       return (data || []).map(payment => ({
         date: payment.payment_date,
         amount: payment.amount.toString(),
@@ -146,7 +155,7 @@ export default function Profile() {
   }) || [];
 
   return (
-    <div className="space-y-6 max-w-5xl mx-auto">
+    <div className="space-y-6 max-w-5xl mx-auto p-6">
       <h1 className="text-4xl font-bold bg-gradient-to-r from-primary via-primary/80 to-primary/60 bg-clip-text text-transparent">
         Member Profile
       </h1>
