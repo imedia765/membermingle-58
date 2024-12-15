@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { useQuery } from "@tanstack/react-query";
 import { supabase } from "@/integrations/supabase/client";
 import { AccountSettingsSection } from "@/components/profile/AccountSettingsSection";
@@ -7,6 +7,7 @@ import { PaymentHistorySection } from "@/components/profile/PaymentHistorySectio
 import { SupportSection } from "@/components/profile/SupportSection";
 import { Skeleton } from "@/components/ui/skeleton";
 import { useToast } from "@/components/ui/use-toast";
+import { useNavigate } from "react-router-dom";
 
 interface Payment {
   date: string;
@@ -19,15 +20,44 @@ export default function Profile() {
   const [searchDate, setSearchDate] = useState("");
   const [searchAmount, setSearchAmount] = useState("");
   const { toast } = useToast();
+  const navigate = useNavigate();
+  const [userEmail, setUserEmail] = useState<string | null>(null);
+
+  // Check authentication and get user email
+  useEffect(() => {
+    const checkAuth = async () => {
+      const { data: { session } } = await supabase.auth.getSession();
+      if (!session) {
+        navigate("/login");
+        return;
+      }
+      setUserEmail(session.user.email);
+    };
+
+    checkAuth();
+
+    const { data: { subscription } } = supabase.auth.onAuthStateChange((event, session) => {
+      if (!session) {
+        navigate("/login");
+      } else {
+        setUserEmail(session.user.email);
+      }
+    });
+
+    return () => {
+      subscription.unsubscribe();
+    };
+  }, [navigate]);
 
   // Fetch member profile data
   const { data: memberData, isLoading: memberLoading } = useQuery({
-    queryKey: ['member-profile'],
+    queryKey: ['member-profile', userEmail],
+    enabled: !!userEmail,
     queryFn: async () => {
       const { data, error } = await supabase
         .from('members')
         .select('*')
-        .limit(1)
+        .eq('email', userEmail)
         .single();
 
       if (error) {
@@ -45,11 +75,13 @@ export default function Profile() {
 
   // Fetch payment history
   const { data: paymentsData, isLoading: paymentsLoading } = useQuery({
-    queryKey: ['member-payments'],
+    queryKey: ['member-payments', memberData?.id],
+    enabled: !!memberData?.id,
     queryFn: async () => {
       const { data, error } = await supabase
         .from('payments')
         .select('*')
+        .eq('member_id', memberData.id)
         .order('payment_date', { ascending: false });
 
       if (error) {
@@ -61,7 +93,6 @@ export default function Profile() {
         throw error;
       }
 
-      // Transform the data to match the Payment interface
       return (data || []).map(payment => ({
         date: payment.payment_date,
         amount: payment.amount.toString(),
