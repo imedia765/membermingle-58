@@ -58,7 +58,7 @@ export default function Profile() {
         .from('members')
         .select('*')
         .eq('email', userEmail)
-        .single();
+        .maybeSingle(); // Using maybeSingle() instead of single()
 
       if (error) {
         toast({
@@ -67,6 +67,15 @@ export default function Profile() {
           variant: "destructive",
         });
         throw error;
+      }
+
+      if (!data) {
+        toast({
+          title: "Profile not found",
+          description: "No member profile found for this email address.",
+          variant: "destructive",
+        });
+        return null;
       }
 
       return data;

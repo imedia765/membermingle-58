@@ -18,4 +18,5 @@ export interface Member {
   membership_type: string | null;
   collector: string | null;
   cors_enabled: boolean | null;
+  name?: string; // Added to satisfy CoveredMembersOverview component
 }
