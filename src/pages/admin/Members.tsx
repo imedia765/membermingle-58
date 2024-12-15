@@ -27,8 +27,14 @@ export default function Members() {
         throw error;
       }
       
-      console.log('Fetched members:', data);
-      return data;
+      // Map the full_name to name for CoveredMembersOverview compatibility
+      const mappedData = data.map(member => ({
+        ...member,
+        name: member.full_name
+      }));
+      
+      console.log('Fetched members:', mappedData);
+      return mappedData;
     }
   });
 
